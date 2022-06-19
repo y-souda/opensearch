@@ -1,0 +1,117 @@
+version: '2.4'
+services:
+  os-node1:
+    image: opensearchproject/opensearch:${TAG}
+    restart: always
+    environment:
+      - cluster.name=os-cluster
+      - node.name=os-node1
+      - discovery.seed_hosts=os-node1,os-node2
+      - cluster.initial_master_nodes=os-node1,os-node2
+      - bootstrap.memory_lock=true # along with the memlock settings below, disables swapping
+      - plugins.security.ssl.http.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g" # minimum and maximum Java heap size, recommend setting both to 50% of system RAM
+      - node.ingest=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536 # maximum number of open files for the Elasticsearch user, set to at least 65536 on modern systems
+        hard: 65536
+    volumes:
+      - os-data1:/usr/share/opensearch/data
+    ports:
+      - 127.0.0.1:9200:9200
+      - 9600:9600 # required for Performance Analyzer
+    logging:
+      driver: "json-file" # defaults if not specified
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  os-node2:
+    image: opensearchproject/opensearch:${TAG}
+    restart: always
+    environment:
+      - cluster.name=os-cluster
+      - node.name=os-node2
+      - discovery.seed_hosts=os-node1,os-node2
+      - cluster.initial_master_nodes=os-node1,os-node2
+      - bootstrap.memory_lock=true
+      - plugins.security.ssl.http.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g" # minimum and maximum Java heap size, recommend setting both to 50% of system RAM
+      - node.ingest=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536 # maximum number of open files for the Elasticsearch user, set to at least 65536 on modern systems
+        hard: 65536
+    volumes:
+      - os-data2:/usr/share/opensearch/data
+    ports:
+      - 127.0.0.1:9201:9200
+    logging:
+      driver: "json-file" # defaults if not specified
+      options:
+        max-size: "10m"
+
+ # data node
+  os-node3:
+    image: opensearchproject/opensearch:${TAG}
+    restart: always
+    environment:
+      - cluster.name=os-cluster
+      - node.name=os-node3
+      - discovery.seed_hosts=os-node1,os-node2
+      - cluster.initial_master_nodes=os-node1,os-node2
+      - bootstrap.memory_lock=true
+      - plugins.security.ssl.http.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g" # minimum and maximum Java heap size, recommend setting both to 50% of system RAM
+      - node.data=true
+      - node.master=false
+      - node.ingest=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536 # maximum number of open files for the Elasticsearch user, set to at least 65536 on modern systems
+        hard: 65536
+    volumes:
+      - os-data3:/usr/share/opensearch/data
+    ports:
+      - 127.0.0.1:9202:9200
+    logging:
+      driver: "json-file" # defaults if not specified
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  dashboard:
+    image: opensearchproject/opensearch-dashboards:${TAG}
+    restart: always
+    expose:
+      - "5601"
+    environment:
+      - server.ssl.enabled=false
+      - OPENSEARCH_URL=http://127.0.0.1:9202
+      - OPENSEARCH_HOSTS=["http://127.0.0.1:9202"]
+    network_mode: "host"
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash-oss:7.12.1
+    restart: always
+    pid: "host"
+    expose:
+      - "1514"
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    network_mode: "host"
+
+volumes:
+  os-data1:
+  os-data2:
+  os-data3:
